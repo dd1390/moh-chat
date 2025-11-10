@@ -1,21 +1,24 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8" />
-  <title>دردشة خاصة</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<title>moh-chat</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
+
 <div id="login">
-  <input id="room" placeholder="اسم الغرفة (مثال: moh-chat)">
+  <h2>دخول الشات</h2>
+  <input id="room" placeholder="اسم الغرفة">
   <input id="name" placeholder="اسمك">
-  <button id="go">دخول</button>
+  <button id="enter">دخول</button>
 </div>
 
 <div id="chat" style="display:none;">
+  <button id="clearChat">مسح المحادثة</button>
   <div id="msgs"></div>
-  <form id="send">
-    <input id="txt" placeholder="اكتب رسالة..." autocomplete="off">
+  <form id="sendForm">
+    <input id="msgInput" placeholder="اكتب رسالة..." autocomplete="off">
     <button>إرسال</button>
   </form>
 </div>
@@ -24,4 +27,3 @@
 <script src="script.js"></script>
 </body>
 </html>
-
