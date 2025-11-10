@@ -11,11 +11,11 @@ const voiceBtn = document.getElementById("voiceBtn");
 const voiceStatus = document.getElementById("voiceStatus");
 const pttButton = document.getElementById("pttButton");
 const voiceLevel = document.getElementById("voiceLevel");
+const typing = document.getElementById("typing");
 
 let room, name;
-let localStream, peerConnection;
-let micTrack;
-let audioContext, analyser, dataArray;
+let localStream, peerConnection, micTrack;
+let audioContext, analyser, dataArray, typingTimeout;
 
 // دخول الغرفة
 enterBtn.onclick = () => {
@@ -32,16 +32,18 @@ socket.on("history", (list) => list.forEach(addMessage));
 socket.on("message", addMessage);
 socket.on("cleared", () => msgs.innerHTML = "");
 
+// إرسال رسالة
 sendForm.onsubmit = (e) => {
   e.preventDefault();
-  const text = msgInput.value.trim();
-  if (!text) return;
-  socket.emit("message", { room, name, text });
+  if (!msgInput.value.trim()) return;
+  socket.emit("message", { room, name, text: msgInput.value });
   msgInput.value = "";
 };
 
+// مسح محادثة
 clearBtn.onclick = () => socket.emit("clear", room);
 
+// عرض الرسائل
 function addMessage({ name, text }) {
   const div = document.createElement("div");
   div.innerHTML = `<b>${name}:</b> ${text}`;
@@ -49,15 +51,15 @@ function addMessage({ name, text }) {
   msgs.scrollTop = msgs.scrollHeight;
 }
 
-
-// ===== Voice =====
+// ===== تفعيل الصوت =====
 voiceBtn.onclick = async () => {
   voiceStatus.innerText = "🎙️ جاري تفعيل الصوت...";
   localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   micTrack = localStream.getAudioTracks()[0];
 
+  // مؤشر الصوت
   audioContext = new AudioContext();
-  const source = audioContext.createMediaStreamSource(localStream);
+  let source = audioContext.createMediaStreamSource(localStream);
   analyser = audioContext.createAnalyser();
   analyser.fftSize = 512;
   dataArray = new Uint8Array(analyser.frequencyBinCount);
@@ -68,16 +70,27 @@ voiceBtn.onclick = async () => {
   voiceStatus.innerText = "🎤 الصوت جاهز";
 };
 
+// اتصال الصوت WebRTC + سيرفر TURN
 async function startVoiceConnection() {
-  peerConnection = new RTCPeerConnection();
+  peerConnection = new RTCPeerConnection({
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      {
+        urls: "turn:openrelay.metered.ca:80",
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      }
+    ]
+  });
+
+  peerConnection.addTrack(micTrack, localStream);
+
   peerConnection.ontrack = (event) => {
     const audio = document.createElement("audio");
     audio.srcObject = event.streams[0];
     audio.autoplay = true;
     document.body.appendChild(audio);
   };
-
-  peerConnection.addTrack(micTrack, localStream);
 
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
@@ -85,17 +98,27 @@ async function startVoiceConnection() {
 }
 
 socket.on("voice-offer", async ({ offer }) => {
+  peerConnection = new RTCPeerConnection({
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      {
+        urls: "turn:openrelay.metered.ca:80",
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      }
+    ]
+  });
+
   localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   micTrack = localStream.getAudioTracks()[0];
+  peerConnection.addTrack(micTrack, localStream);
 
-  peerConnection = new RTCPeerConnection();
   peerConnection.ontrack = (event) => {
     const audio = document.createElement("audio");
     audio.srcObject = event.streams[0];
     audio.autoplay = true;
     document.body.appendChild(audio);
   };
-  peerConnection.addTrack(micTrack, localStream);
 
   await peerConnection.setRemoteDescription(offer);
   const answer = await peerConnection.createAnswer();
@@ -107,20 +130,38 @@ socket.on("voice-answer", async ({ answer }) => {
   await peerConnection.setRemoteDescription(answer);
 });
 
-
-// ===== Push-To-Talk =====
-pttButton.onmousedown = () => micTrack.enabled = true;
-pttButton.onmouseup   = () => micTrack.enabled = false;
-pttButton.ontouchstart = () => micTrack.enabled = true;
-pttButton.ontouchend   = () => micTrack.enabled = false;
+// ===== Push To Talk =====
+pttButton.onmousedown = () => micTrack.enabled = true, socket.emit("talking", { room, name, talking:true });
+pttButton.onmouseup   = () => micTrack.enabled = false, socket.emit("talking", { room, name, talking:false });
 
 document.addEventListener("keydown", (e) => {
-  if (e.code === "CapsLock") micTrack.enabled = true;
+  if (e.code === "CapsLock") micTrack.enabled = true, socket.emit("talking", { room, name, talking:true });
 });
 document.addEventListener("keyup", (e) => {
-  if (e.code === "CapsLock") micTrack.enabled = false;
+  if (e.code === "CapsLock") micTrack.enabled = false, socket.emit("talking", { room, name, talking:false });
 });
 
+// ===== من يتكلم =====
+socket.on("talking", ({ name, talking }) => highlightSpeaker(name, talking));
+
+function highlightSpeaker(name, talking) {
+  [...document.querySelectorAll("#msgs b")].forEach(el => {
+    if (el.textContent.replace(":", "") === name) {
+      el.style.color = talking ? "#4ade80" : "#fff";
+    }
+  });
+}
+
+// ===== يكتب الآن =====
+msgInput.oninput = () => socket.emit("typing", { room, name });
+
+socket.on("typing", ({ name }) => {
+  typing.innerText = `${name} يكتب... ✍️`;
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => typing.innerText = "", 1000);
+});
+
+// ===== مؤشر الصوت =====
 function updateVoiceLevel() {
   requestAnimationFrame(updateVoiceLevel);
   analyser.getByteFrequencyData(dataArray);
