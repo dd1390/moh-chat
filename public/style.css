@@ -1,5 +1,6 @@
-body { background:#111; color:#fff; font-family:sans-serif; padding:20px; }
-#login, #chat { max-width:400px; margin:auto; }
-#msgs { height:300px; overflow:auto; border:1px solid #333; padding:10px; margin-bottom:10px; background:#222; }
-input, button { width:100%; padding:10px; margin:5px 0; border-radius:6px; border:none; }
-button { background:#4ade80; color:#000; font-weight:bold; cursor:pointer; }
+body { background:#111; color:#fff; font-family:sans-serif; margin:0; padding:20px; }
+#login, #chat { max-width:420px; margin:auto; }
+#msgs { background:#222; padding:10px; height:320px; overflow:auto; border-radius:8px; margin-top:10px; }
+input, button { width:100%; padding:10px; margin:6px 0; border-radius:6px; border:none; font-size:16px; }
+button { background:#4ade80; color:black; font-weight:bold; cursor:pointer; }
+#clearChat { background:#c0392b; color:white; }
