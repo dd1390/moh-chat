@@ -9,9 +9,13 @@ const msgInput = document.getElementById("msgInput");
 const clearBtn = document.getElementById("clearChat");
 const voiceBtn = document.getElementById("voiceBtn");
 const voiceStatus = document.getElementById("voiceStatus");
+const pttButton = document.getElementById("pttButton");
+const voiceLevel = document.getElementById("voiceLevel");
 
 let room, name;
 let localStream, peerConnection;
+let micTrack;
+let audioContext, analyser, dataArray;
 
 // دخول الغرفة
 enterBtn.onclick = () => {
@@ -23,13 +27,9 @@ enterBtn.onclick = () => {
   chat.style.display = "block";
 };
 
-// history
+// رسائل
 socket.on("history", (list) => list.forEach(addMessage));
-
-// الرسائل
 socket.on("message", addMessage);
-
-// مسح المحادثة
 socket.on("cleared", () => msgs.innerHTML = "");
 
 sendForm.onsubmit = (e) => {
@@ -49,40 +49,53 @@ function addMessage({ name, text }) {
   msgs.scrollTop = msgs.scrollHeight;
 }
 
-// Voice Chat
+
+// ===== Voice =====
 voiceBtn.onclick = async () => {
   voiceStatus.innerText = "🎙️ جاري تفعيل الصوت...";
   localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  micTrack = localStream.getAudioTracks()[0];
 
+  audioContext = new AudioContext();
+  const source = audioContext.createMediaStreamSource(localStream);
+  analyser = audioContext.createAnalyser();
+  analyser.fftSize = 512;
+  dataArray = new Uint8Array(analyser.frequencyBinCount);
+  source.connect(analyser);
+  updateVoiceLevel();
+
+  startVoiceConnection();
+  voiceStatus.innerText = "🎤 الصوت جاهز";
+};
+
+async function startVoiceConnection() {
   peerConnection = new RTCPeerConnection();
-  localStream.getTracks().forEach((track) => peerConnection.addTrack(track, localStream));
-
   peerConnection.ontrack = (event) => {
     const audio = document.createElement("audio");
     audio.srcObject = event.streams[0];
     audio.autoplay = true;
     document.body.appendChild(audio);
   };
+
+  peerConnection.addTrack(micTrack, localStream);
 
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
   socket.emit("voice-offer", { room, offer });
-
-  voiceStatus.innerText = "🎤 الصوت شغال";
-};
+}
 
 socket.on("voice-offer", async ({ offer }) => {
   localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  micTrack = localStream.getAudioTracks()[0];
 
   peerConnection = new RTCPeerConnection();
-  localStream.getTracks().forEach((track) => peerConnection.addTrack(track, localStream));
-
   peerConnection.ontrack = (event) => {
     const audio = document.createElement("audio");
     audio.srcObject = event.streams[0];
     audio.autoplay = true;
     document.body.appendChild(audio);
   };
+  peerConnection.addTrack(micTrack, localStream);
 
   await peerConnection.setRemoteDescription(offer);
   const answer = await peerConnection.createAnswer();
@@ -93,3 +106,24 @@ socket.on("voice-offer", async ({ offer }) => {
 socket.on("voice-answer", async ({ answer }) => {
   await peerConnection.setRemoteDescription(answer);
 });
+
+
+// ===== Push-To-Talk =====
+pttButton.onmousedown = () => micTrack.enabled = true;
+pttButton.onmouseup   = () => micTrack.enabled = false;
+pttButton.ontouchstart = () => micTrack.enabled = true;
+pttButton.ontouchend   = () => micTrack.enabled = false;
+
+document.addEventListener("keydown", (e) => {
+  if (e.code === "CapsLock") micTrack.enabled = true;
+});
+document.addEventListener("keyup", (e) => {
+  if (e.code === "CapsLock") micTrack.enabled = false;
+});
+
+function updateVoiceLevel() {
+  requestAnimationFrame(updateVoiceLevel);
+  analyser.getByteFrequencyData(dataArray);
+  let level = Math.max(...dataArray) / 255;
+  voiceLevel.style.width = (level * 100) + "%";
+}
