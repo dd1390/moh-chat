@@ -5,8 +5,7 @@ input, button { width:100%; padding:10px; margin:6px 0; border-radius:6px; borde
 button { background:#4ade80; color:black; font-weight:bold; cursor:pointer; }
 #clearChat { background:#c0392b; color:white; }
 #voiceBtn { background:#4aa3ff; color:black; }
-
-/* PTT + مؤشر الصوت */
 #pttButton { background:#ffcc00; color:#000; font-weight:bold; border-radius:8px; }
-#voiceLevelBar { background:#333; width:100%; height:10px; border-radius:4px; margin-top:6px; }
+#voiceLevelBar { background:#333; width:100%; height:10px; border-radius:4px; }
 #voiceLevel { background:#4ade80; height:10px; width:0%; border-radius:4px; }
+#typing { color:#aaa; margin-top:5px; font-style:italic; }
